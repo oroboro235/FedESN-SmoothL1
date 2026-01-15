@@ -1,4 +1,5 @@
-# reservoir
+# this exp is for 
+# testing the SGD on ESN states
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -81,10 +82,12 @@ if __name__ == "__main__":
 
     # ================================================================================================
     def mse_fval(w, X, y):
-        return np.sum((np.dot(X, w) - y)**2)
+        n_sample = X.shape[0]
+        return (1.0 / n_sample) * np.sum((np.dot(X, w) - y)**2)
     
     def mse_grad(w, X, y):
-        return 2 * np.dot(X.T, np.dot(X, w) - y)
+        n_sample = X.shape[0]
+        return (2.0 / n_sample) * np.dot(X.T, np.dot(X, w) - y)
 
     from scipy.special import logsumexp
 
@@ -126,13 +129,21 @@ if __name__ == "__main__":
             new_alpha = max_alpha
 
         return new_alpha
+    
+    def l2_fval(w, _lambda):
+        return 0.5 * _lambda * np.sum(w**2)
+    
+    def l2_grad(w, _lambda):
+        return _lambda * w
+    
+
     # ================================================================================================
 
     def sgd(X, y, learning_rate=0.1, epochs=1000, batch_size=100):
         n_sample = X.shape[0]
 
-        # w = np.random.rand(UNITS, 1)
-        w = np.zeros((UNITS, 1))
+        w = np.random.rand(UNITS, 1)
+        # w = np.zeros((UNITS, 1))
 
         # X = np.c_[np.ones((n_sample, 1)), X]
 
@@ -156,6 +167,7 @@ if __name__ == "__main__":
                     grad += mse_grad(w, X_batch[j], y_batch[j])
                 grad /= batch_size
                 grad += sl1_grad(w, alpha, _lambda)
+                # grad += l2_grad(w, _lambda)
 
                 if grad.max() >= 1e3:
                     grad = np.ones_like(grad) * 1e3
@@ -163,18 +175,19 @@ if __name__ == "__main__":
                 w -= learning_rate * grad
 
             loss = mse_fval(w, X, y) + sl1_fval(w, alpha, _lambda)
+            # loss = mse_fval(w, X, y) + l2_fval(w, _lambda)
             loss_history.append(loss)
 
             alpha = update_alpha(alpha, epoch)
 
             if epoch % 10 == 0:
-                print(f"Epoch {epoch}: loss={loss}")
+                print(f"Epoch {epoch}: loss={loss}, nonzeros={np.count_nonzero(w)}")
 
         return w, loss_history
     
     # rand_X, rand_y = np.random.rand(800, 500, UNITS), np.random.rand(800, 500, 1)
 
-    w, loss_history = sgd(s_X_tr, train_batches_Y, learning_rate=0.01, epochs=1000, batch_size=1)
+    w, loss_history = sgd(s_X_tr, train_batches_Y, learning_rate=1e-1, epochs=4000, batch_size=800)
     # w, loss_history = sgd(rand_X, rand_y, learning_rate=0.01, epochs=1000, batch_size=10)
 
 
@@ -183,9 +196,6 @@ if __name__ == "__main__":
     plt.ylabel("Loss")
     plt.show()
     plt.savefig("loss_history.png")
-
-
-
 
             
     # ================================================================================================
