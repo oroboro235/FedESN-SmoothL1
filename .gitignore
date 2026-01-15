@@ -1,2 +1,4 @@
 raw/tsr/
 raw/tsc/
+__pycache__/
+cache/
