@@ -363,3 +363,127 @@ class Combinator:
             hess_val = None
         return func_val, grad_val, hess_val
     
+
+
+# ===========================================================================
+#                         Seperated functions  
+# ===========================================================================
+
+# mse
+def mse_fval(w, X, y):
+    n_sample = X.shape[0]
+    return (1.0 / n_sample) * np.sum((np.dot(X, w) - y)**2)
+
+def mse_grad(w, X, y):
+    n_sample = X.shape[0]
+    return (2.0 / n_sample) * np.dot(X.T, np.dot(X, w) - y)
+
+# ===========================================================================
+
+# softmax
+def softmax(z):
+    exp_z = np.exp(z - np.max(z, axis=-1, keepdims=True))  # 数值稳定
+    return exp_z / np.sum(exp_z, axis=-1, keepdims=True)
+
+def cross_entropy_loss(y, X, w, epsilon=1e-12):
+    """
+    y_true_onehot: (batch_size, num_classes) one-hot
+    logits: (batch_size, num_classes) 未经过softmax
+    """
+    # 计算softmax概率
+    probs = softmax(X @ w)
+    
+    # 裁剪避免log(0)
+    probs = np.clip(probs, epsilon, 1.0)
+    
+    # 交叉熵损失
+    loss = -np.sum(y * np.log(probs)) / y.shape[0]
+    return loss
+
+def cross_entropy_gradient(y, X, w):
+    """
+    计算梯度: p - y
+    """
+    probs = softmax(X @ w)
+    grad = probs - y
+    return X.T @ grad
+
+
+# ===========================================================================
+
+# smoothL1
+def logsumexp(b):
+    """
+    Computes logsumexp across columns
+    """
+    # B = np.max(b, axis=1, keepdims=True)
+    B = np.max(b, axis=1)
+    repmat_B = np.tile(B, (b.shape[1], 1)).T
+    lse = np.log(np.sum(np.exp(b - repmat_B), axis=1)) + B
+    return lse
+
+def sl1_fval(w, alpha, _lambda):
+    n_feature = w.shape[0]
+    
+    lse = logsumexp(np.hstack([np.zeros((n_feature, 9)), alpha*w]))
+    neg_lse = logsumexp(np.hstack([np.zeros((n_feature, 9)), -alpha*w]))
+
+    # without bias 
+    lambda_vec = (_lambda * np.ones(n_feature)).squeeze()
+    fval = np.sum((lambda_vec * (1.0 / alpha)) * (lse + neg_lse))
+    return fval
+
+def sl1_grad(w, alpha, _lambda):
+    (n_feature, n_class) = w.shape
+
+    w = w.reshape(-1, 1)
+
+    # lse = logsumexp(np.hstack([np.zeros((n_feature, 9)), alpha*w]), axis=1)
+    lse = logsumexp(np.hstack([np.zeros((n_feature*n_class, 1)), alpha*w]))
+
+    lambda_vec = (_lambda * np.ones(n_feature*n_class)).squeeze()
+
+    grad = (lambda_vec * (1.0 - 2.0 * np.exp(-lse))).reshape(-1, 1)
+
+    grad = grad.reshape(n_feature, n_class)
+
+    return grad
+
+def update_alpha(alpha, cnt=0):
+    update1 = 1.5
+    update2 = 1.25
+    max_alpha = 1e7
+
+    if cnt == 0:
+        new_alpha = alpha * update1
+    elif cnt > 0:
+        new_alpha = alpha * update2
+    else:
+        new_alpha = alpha
+
+    if new_alpha > max_alpha:
+        new_alpha = max_alpha
+
+    return new_alpha
+
+
+def mse_sl1_fval(w, X, y, alpha, _lambda):
+    obj_fval = mse_fval(w, X, y)
+    reg_fval = sl1_fval(w, alpha, _lambda)
+    return obj_fval + reg_fval
+
+def mse_sl1_grad(w, X, y, alpha, _lambda):
+    obj_grad = mse_grad(w, X, y)
+    reg_grad = sl1_grad(w, alpha, _lambda)
+    return obj_grad + reg_grad
+
+
+def ce_sl1_fval(w, X, y, alpha, _lambda):
+    obj_fval = cross_entropy_loss(y, X, w)
+    reg_fval = sl1_fval(w, alpha, _lambda)
+    return obj_fval + reg_fval
+
+def ce_sl1_grad(w, X, y, alpha, _lambda):
+    obj_grad = cross_entropy_gradient(y, X, w)
+    reg_grad = sl1_grad(w, alpha, _lambda)
+    return obj_grad + reg_grad

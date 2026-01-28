@@ -7,12 +7,12 @@ import matplotlib.pyplot as plt
 from reservoirpy.nodes import Reservoir, Ridge
 from reservoirpy.datasets import mackey_glass, to_forecasting
 
-
+np.random.seed(1234)
 
 import reservoirpy as rpy
 
 
-UNITS = 100               # - number of neurons
+UNITS = 500               # - number of neurons
 LEAK_RATE = 0.3           # - leaking rate
 SPECTRAL_RADIUS = 0.9    # - spectral radius of W
 INPUT_SCALING = 1.0       # - input scaling
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     def update_alpha(alpha, cnt=0):
         update1 = 1.5
         update2 = 1.25
-        max_alpha = 5e4
+        max_alpha = 5e5
 
         if cnt == 0:
             new_alpha = alpha * update1
@@ -145,34 +145,28 @@ if __name__ == "__main__":
         w = np.random.rand(UNITS, 1)
         # w = np.zeros((UNITS, 1))
 
-        # X = np.c_[np.ones((n_sample, 1)), X]
-
         # for loss function
         alpha = 1.0
+        thres = 1e-5
         _lambda = 1e-2
 
         loss_history = []
 
         for epoch in range(epochs):
-            indices = np.random.permutation(n_sample)
-            X_shuffled = X[indices]
-            y_shuffled = y[indices]
+            indices = np.random.permutation(batch_size)
+            X_batch = X[indices]
+            y_batch = y[indices]
 
-            for i in range(0, n_sample, batch_size):
-                X_batch = X_shuffled[i:i+batch_size]
-                y_batch = y_shuffled[i:i+batch_size]
+            grad = 0.0
+            for j in range(batch_size):
+                grad += mse_grad(w, X_batch[j], y_batch[j])
+            grad /= batch_size
+            grad += sl1_grad(w, alpha, _lambda)
+            # grad += l2_grad(w, _lambda)
+            w -= learning_rate * grad
 
-                grad = 0.0
-                for j in range(batch_size):
-                    grad += mse_grad(w, X_batch[j], y_batch[j])
-                grad /= batch_size
-                grad += sl1_grad(w, alpha, _lambda)
-                # grad += l2_grad(w, _lambda)
-
-                if grad.max() >= 1e3:
-                    grad = np.ones_like(grad) * 1e3
-
-                w -= learning_rate * grad
+            # shrink to zero
+            w[np.abs(w) < thres] = 0.0
 
             loss = mse_fval(w, X, y) + sl1_fval(w, alpha, _lambda)
             # loss = mse_fval(w, X, y) + l2_fval(w, _lambda)
@@ -184,17 +178,15 @@ if __name__ == "__main__":
                 print(f"Epoch {epoch}: loss={loss}, nonzeros={np.count_nonzero(w)}")
 
         return w, loss_history
+
+    w, loss_history = sgd(s_X_tr, train_batches_Y, learning_rate=1e-2, epochs=5000, batch_size=200)
+
     
-    # rand_X, rand_y = np.random.rand(800, 500, UNITS), np.random.rand(800, 500, 1)
-
-    w, loss_history = sgd(s_X_tr, train_batches_Y, learning_rate=1e-1, epochs=4000, batch_size=800)
-    # w, loss_history = sgd(rand_X, rand_y, learning_rate=0.01, epochs=1000, batch_size=10)
-
 
     plt.plot(loss_history)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    plt.show()
+    # plt.show()
     plt.savefig("loss_history.png")
 
             
