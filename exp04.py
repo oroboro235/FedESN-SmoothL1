@@ -258,9 +258,11 @@ def initialize_clients(n_clients: int, no_cross: bool = True, n_sample_per_clien
     # Fourier transform to get multiple components from the raw series
     # n_clients means the n_components of frequencies from fft.
     # raw (n_samples, 1) -> raw (n_samples, n_clients)
-    from utils import get_fft_curves_split_n
+    from utils import get_fft_curves_split_n, get_diff_sampling_rate_series
 
     signals = get_fft_curves_split_n(raw, n_clients, 100, is_plot=False)
+    # signals = get_diff_sampling_rate_series(raw, n_clients, sample_rate=[1, 2, 5, 10, 15], n_samples=n_samples)
+
 
     clients = []
     random_seeds = np.random.randint(0, 10000, n_clients)
@@ -382,3 +384,25 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

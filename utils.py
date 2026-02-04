@@ -32,6 +32,7 @@ def get_fft_curves_split_n(x, n=3, max_freq=None, is_plot=False):
     results = []
     for i in range(n):
         start_freq = i * step_size
+        # end_freq = start_freq + (int)(step_size * 1.5)
         end_freq = start_freq + step_size
         freq_indices = np.where((freqs >= start_freq) & (freqs < end_freq))[0]
         if len(freq_indices) == 0:
@@ -103,18 +104,6 @@ def get_fft_curves_top_n(x, top_n=3):
         single_signal = irfft(single_fft, n=len(t))
         individual_signals.append(single_signal)
 
-    # plt.figure(figsize=(12, 8))
-    # for i, (freq, sig) in enumerate(zip(top_freqs, individual_signals)):
-    #     plt.subplot(len(individual_signals), 1, i+1)
-    #     plt.plot(t, sig, label=f'{freq:.2f} Hz')
-    #     plt.ylabel('Magnitude')
-    #     plt.legend()
-    #     plt.grid(True)
-    # plt.suptitle('Individual frequency components')
-    # plt.xlabel('Time')
-    # plt.tight_layout()
-    # plt.show()
-
     # add up all the signals to get the final signal, compared with original signal
     final_signal = np.sum(individual_signals, axis=0)
     plt.plot(t, x, label='Original signal')
@@ -126,5 +115,53 @@ def get_fft_curves_top_n(x, top_n=3):
     plt.title('FFT analysis')
     plt.show()
 
-
     return individual_signals
+
+
+def get_diff_sampling_rate_series(n=5, sample_period=[], len_forecast=1, len_window=100, step=1, n_samples=100,):
+    if sample_period == []:
+        sample_period = [1] * n
+
+    
+    len_ts = (len_window + step * n_samples) * max(sample_period)
+
+    from reservoirpy.datasets import mackey_glass
+
+    raw = mackey_glass(len_ts)
+    raw = 2 * (raw - raw.min()) / (raw.max() - raw.min()) - 1
+
+
+    
+    diff_sampling_rate_series = []
+    for i in range(n):
+        diff_sampling_rate_series.append(raw[::sample_period[i]][:(len_window+step*n_samples)])
+
+    diff_sampling_rate_series = np.array(diff_sampling_rate_series)
+
+    return diff_sampling_rate_series, raw
+
+    
+
+
+
+
+def plot_readout(readout):
+    import matplotlib.pyplot as plt
+    Wout = readout.Wout
+    # bias = readout.bias
+    # Wout = np.r_[bias[..., np.newaxis], Wout]
+
+    # calculate the sparsity of the readout
+    sparsity = (Wout == 0).mean() * 100
+    print(f"Sparsity of the readout: {sparsity:.2f}%")
+
+    fig = plt.figure(figsize=(15, 5))
+
+    ax = fig.add_subplot(111)
+    ax.grid(axis="y")
+    ax.set_ylabel("Coefs. of $W_{out}$")
+    ax.set_xlabel("reservoir neurons index")
+    ax.bar(np.arange(Wout.size), Wout.ravel()[::-1])
+
+    plt.show()
+    plt.savefig("readout_coefs.png")

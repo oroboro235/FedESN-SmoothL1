@@ -6,8 +6,6 @@ from reservoirpy.nodes import Reservoir, Ridge
 from reservoirpy.node import TrainableNode
 from model import SmoothL1_Classifier_Node
 
-from utils import plot_readout
-
 global rng_seed
 rng_seed = 1234
 np.random.seed(rng_seed)
@@ -26,7 +24,6 @@ class Client:
     def receive_hyperparams(self, hyperparams: Dict[str, Any]):
         """Receive hyperparameters from server"""
         self.hyperparams = hyperparams
-        self.local_lr = hyperparams["local_lr"]
         
     def initialize_model(self, input_dim: int, output_dim: int, Win: np.ndarray = None, Wres: np.ndarray = None, bias: float = None):
         """Initialize model"""
@@ -78,6 +75,9 @@ class Client:
             raise ValueError("Model or hyperparameters not initialized")
             
         self.model.fit(self.X_train, self.y_train)
+
+        # calculate sparsity of readout
+        self.sparsity = (self.model.nodes[1].Wout == 0).mean() * 100
         
         return self.model.nodes[1].Wout
     
@@ -93,9 +93,6 @@ class Client:
         y_true = np.argmax(np.array(self.y_test).squeeze(), axis=1)
 
         acc = (y_pred == y_true).mean()*100
-
-        # calculate sparsity of readout
-        self.sparsity = (self.model.nodes[1].Wout == 0).mean() * 100
         
         return {
             'acc': acc,
@@ -107,13 +104,12 @@ class Client:
         """Receive updated parameters from server"""
         if self.model is None:
             raise ValueError("Model not initialized")
-        self.model.nodes[1].Wout = (1 - self.local_lr) * self.model.nodes[1].Wout + self.local_lr * params
+        self.model.nodes[1].Wout = params
 
 class Server:
     """Server class"""
     def __init__(self, hyperparams: dict = None, n_rounds: int = 10):
         self.hyperparams = hyperparams
-        self.global_lr = hyperparams["global_lr"]
         self.global_model = None
         self.n_rounds = n_rounds
         
@@ -162,8 +158,6 @@ class Server:
         avg_weights /= len(self.client_parameters)
         # avg_bias /= len(self.client_parameters)
         
-        # shrink the avg_weights
-        avg_weights[np.abs(avg_weights) < self.hyperparams["thres"]] = 0.0
 
         return avg_weights
         # return {
@@ -173,21 +167,15 @@ class Server:
     
     def update_global_model(self, avg_params: Dict[str, np.ndarray]):
         """4. Update readout weights with the averaged weight"""
-        if self.global_model.nodes[1].Wout is None:
-            self.global_model.nodes[1].Wout = avg_params * self.global_lr
-            return
-        self.global_model.nodes[1].Wout = (1 - self.global_lr) * self.global_model.nodes[1].Wout + self.global_lr * avg_params
+        self.global_model.nodes[1].Wout = avg_params
         
-    def transmit_parameters(self, clients: List[Client], add_random_noise: bool = False):
+    def transmit_parameters(self, clients: List[Client]):
         """5. Transmit updated weights to all clients"""
         global_params = self.global_model.nodes[1].Wout
-        if add_random_noise:
-            global_params += np.random.normal(scale=0.1, size=global_params.shape)
-        
         for client in clients:
             client.receive_parameters(global_params)
             
-    def run_federated_learning(self, clients: List[Client], input_dim: int, output_dim: int, if_plot: bool = True):
+    def run_federated_learning(self, clients: List[Client], input_dim: int, output_dim: int):
         """Run federated learning process"""
         print("Starting federated learning...")
     
@@ -218,27 +206,7 @@ class Server:
                 client_params = client.train()
                 client.model.reset()
                 self.client_parameters.append(client_params)
-
-            print("Before aggregation:")
-            round_results = []
-            for client in clients:
-                result = client.evaluate()
-                client.model.reset()
-                round_results.append(result)
-                print(f"  Client {client.client_id}: acc: {result['acc']:.2f}%, sparsity: {result['sparsity']:.2f}%")
             
-
-            # collect the weight of client and combine them into subplots
-            if if_plot:
-                from matplotlib import pyplot as plt
-                plt.figure(figsize=(5, 15))
-                for i, client in enumerate(clients):
-                    plt.subplot(5, 1, i+1)
-                    plt.bar(np.arange(client.model.nodes[1].Wout.size), client.model.nodes[1].Wout.ravel()[::-1])
-                    plt.title(f"Client {client.client_id}")
-                plt.tight_layout()
-                plt.show()
-
             # 3. Server aggregates the trained weights from all clients, then does average
             # print("3. Server aggregating and averaging weights...")
             avg_params = self.aggregate_parameters()
@@ -250,11 +218,9 @@ class Server:
             # 5. Server transmits the updated weights to all clients
             # print("5. Server transmitting updated weights to all clients...")
             self.transmit_parameters(clients)
-
             
             # 6. Clients evaluate the performance on their own datasets
             # print("6. Clients evaluating performance...")
-            print("After aggregation:")
             round_results = []
             for client in clients:
                 result = client.evaluate()
@@ -262,22 +228,9 @@ class Server:
                 round_results.append(result)
                 print(f"  Client {client.client_id}: acc: {result['acc']:.2f}%, sparsity: {result['sparsity']:.2f}%")
             
-            if if_plot:
-                from matplotlib import pyplot as plt
-                plt.figure(figsize=(5, 15))
-                for i, client in enumerate(clients):
-                    plt.subplot(5, 1, i+1)
-                    plt.bar(np.arange(client.model.nodes[1].Wout.size), client.model.nodes[1].Wout.ravel()[::-1])
-                    plt.title(f"Client {client.client_id}")
-                plt.tight_layout()
-                plt.show()
-
             # Print round results
             avg_acc = np.mean([r['acc'] for r in round_results])
             avg_spar = np.mean([r['sparsity'] for r in round_results])
-
-            if if_plot:
-                plot_readout(self.global_model.nodes[1])
             
             print(f"  Average accuracy: {avg_acc:.2f}%, Average sparsity: {avg_spar:.2f}%")
             print(f"Global Sparsity: {(self.global_model.nodes[1].Wout == 0).mean()*100:.2f}%")
@@ -286,7 +239,7 @@ class Server:
         print("\nFederated learning completed!")
         return self.global_model
 
-def initialize_clients(n_clients: int, no_cross: bool = False, n_sample_train_per_client: int = 100, n_sample_test_per_client: int = 270):
+def initialize_clients(n_clients: int, no_cross: bool = True, n_sample_per_client: int = 10):
     # load the data
     from reservoirpy.datasets import japanese_vowels
     X_train, X_test, Y_train, Y_test = japanese_vowels()
@@ -315,20 +268,12 @@ def initialize_clients(n_clients: int, no_cross: bool = False, n_sample_train_pe
     else:
         # overlay between clients, randomly split
         for i in range(n_clients):
-            idx = np.random.choice(len(X_train), n_sample_train_per_client, replace=False)
-            if type(X_train) == tuple:
-                X_train_split.append([X_train[j] for j in idx])
-                Y_train_split.append([Y_train[j] for j in idx])
-            else:
-                X_train_split.append(X_train[idx])
-                Y_train_split.append(Y_train[idx])
-            idx = np.random.choice(len(X_train), n_sample_test_per_client, replace=False)
-            if type(X_test) == tuple:
-                X_test_split.append([X_test[j] for j in idx])
-                Y_test_split.append([Y_test[j] for j in idx])
-            else:
-                X_test_split.append(X_test[idx])
-                Y_test_split.append(Y_test[idx])
+            idx = np.random.choice(len(X_train), n_sample_per_client, replace=False)
+            X_train_split.append(X_train[idx])
+            Y_train_split.append(Y_train[idx])
+            idx = np.random.choice(len(X_train), n_sample_per_client//2, replace=False)
+            X_test_split.append(X_test[idx])
+            Y_test_split.append(Y_test[idx])
 
     # create clients
     clients = []
@@ -354,26 +299,22 @@ def main():
     
     # Create server and run federated learning
     hyperparams = {
-        # reservoir params
         "units": 100,
         "lr": 0.1,
-        "sr": 1.1,
+        "sr": 1.0,
         "input_scaling": 0.1,
         "input_connectivity": 0.1,
         "rc_connectivity": 0.1,
-        # 
-        "reg_param": 1e-1,
-        "thres": 1e-3,
+        "reg_param": 1e-2,
+        "thres": 1e-5,
         "learning_rate": 1e-2,
         "local_epochs": 5000,
-        "global_lr": 1.0,
-        "local_lr": 1.0,
     }
-    n_rounds = 10
+    n_rounds = 20
     server = Server(hyperparams=hyperparams, n_rounds=n_rounds)
     
     # Run federated learning
-    global_model = server.run_federated_learning(clients, input_dim, output_dim, if_plot=False)
+    global_model = server.run_federated_learning(clients, input_dim, output_dim)
     global_model.nodes[0].reset()
     # Print final results
     print("\n=== Final Results ===")
