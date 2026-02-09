@@ -362,8 +362,6 @@ class Combinator:
         else:
             hess_val = None
         return func_val, grad_val, hess_val
-    
-
 
 # ===========================================================================
 #                         Seperated functions  
@@ -394,7 +392,8 @@ def cross_entropy_loss(y, X, w, epsilon=1e-12):
     probs = softmax(X @ w)
     
     # 裁剪避免log(0)
-    probs = np.clip(probs, epsilon, 1.0)
+    # probs = np.clip(probs, epsilon, 1.0 - epsilon)
+    probs = probs + epsilon
     
     # 交叉熵损失
     loss = -np.sum(y * np.log(probs)) / y.shape[0]
@@ -423,13 +422,15 @@ def logsumexp(b):
     return lse
 
 def sl1_fval(w, alpha, _lambda):
-    n_feature = w.shape[0]
+    (n_feature, n_class) = w.shape
+
+    w = w.reshape(-1, 1)
     
-    lse = logsumexp(np.hstack([np.zeros((n_feature, 9)), alpha*w]))
-    neg_lse = logsumexp(np.hstack([np.zeros((n_feature, 9)), -alpha*w]))
+    lse = logsumexp(np.hstack([np.zeros((n_feature*n_class, 1)), alpha*w]))
+    neg_lse = logsumexp(np.hstack([np.zeros((n_feature*n_class, 1)), -alpha*w]))
 
     # without bias 
-    lambda_vec = (_lambda * np.ones(n_feature)).squeeze()
+    lambda_vec = (_lambda * np.ones(n_feature*n_class)).squeeze()
     fval = np.sum((lambda_vec * (1.0 / alpha)) * (lse + neg_lse))
     return fval
 
@@ -452,7 +453,7 @@ def sl1_grad(w, alpha, _lambda):
 def update_alpha(alpha, cnt=0):
     update1 = 1.5
     update2 = 1.25
-    max_alpha = 1e7
+    max_alpha = 5e6
 
     if cnt == 0:
         new_alpha = alpha * update1

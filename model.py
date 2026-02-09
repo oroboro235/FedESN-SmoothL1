@@ -312,7 +312,7 @@ class SmoothL1_Classifier_Node(TrainableNode):
     def update_alpha(self, e: int):
         update1 = 1.5
         update2 = 1.25
-        max_alpha = 1e6
+        max_alpha = 5e6
 
         if e == 0:
             _alpha = self.alpha * update1
