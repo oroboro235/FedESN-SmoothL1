@@ -383,7 +383,12 @@ def softmax(z):
     exp_z = np.exp(z - np.max(z, axis=-1, keepdims=True))  # 数值稳定
     return exp_z / np.sum(exp_z, axis=-1, keepdims=True)
 
-def cross_entropy_loss(y, X, w, epsilon=1e-12):
+def softmax_cp(z):
+    import cupy as cp
+    exp_z = cp.exp(z - cp.max(z, axis=-1, keepdims=True))  # 数值稳定
+    return exp_z / cp.sum(exp_z, axis=-1, keepdims=True)
+
+def cross_entropy_loss(w, X, y, epsilon=1e-12):
     """
     y_true_onehot: (batch_size, num_classes) one-hot
     logits: (batch_size, num_classes) 未经过softmax
@@ -399,13 +404,27 @@ def cross_entropy_loss(y, X, w, epsilon=1e-12):
     loss = -np.sum(y * np.log(probs)) / y.shape[0]
     return loss
 
-def cross_entropy_gradient(y, X, w):
+def cross_entropy_loss_cp(w, X, y, epsilon=1e-12):
+    import cupy as cp
+
+    probs = softmax_cp(X @ w)
+    probs = probs + epsilon
+    loss = -cp.sum(y * cp.log(probs)) / y.shape[0]
+    return loss
+
+def cross_entropy_gradient(w, X, y):
     """
     计算梯度: p - y
     """
     probs = softmax(X @ w)
     grad = probs - y
     return X.T @ grad
+
+def cross_entropy_gradient_cp(w, X, y):
+    import cupy as cp
+    probs = softmax_cp(X @ w)
+    grad = probs - y
+    return (X.T @ grad)
 
 
 # ===========================================================================
@@ -421,6 +440,13 @@ def logsumexp(b):
     lse = np.log(np.sum(np.exp(b - repmat_B), axis=1)) + B
     return lse
 
+def logsumexp_cp(b):
+    import cupy as cp
+    B = cp.max(b, axis=1)
+    repmat_B = cp.tile(B, (b.shape[1], 1)).T
+    lse = cp.log(cp.sum(cp.exp(b - repmat_B), axis=1)) + B
+    return lse
+
 def sl1_fval(w, alpha, _lambda):
     (n_feature, n_class) = w.shape
 
@@ -432,6 +458,16 @@ def sl1_fval(w, alpha, _lambda):
     # without bias 
     lambda_vec = (_lambda * np.ones(n_feature*n_class)).squeeze()
     fval = np.sum((lambda_vec * (1.0 / alpha)) * (lse + neg_lse))
+    return fval
+
+def sl1_fval_cp(w, alpha, _lambda):
+    import cupy as cp
+    (n_feature, n_class) = w.shape
+    w = w.reshape(-1, 1)
+    lse = logsumexp_cp(cp.hstack([cp.zeros((n_feature*n_class, 1)), alpha*w]))
+    neg_lse = logsumexp_cp(cp.hstack([cp.zeros((n_feature*n_class, 1)), -alpha*w]))
+    lambda_vec = (_lambda * cp.ones(n_feature*n_class)).squeeze()
+    fval = cp.sum((lambda_vec * (1.0 / alpha)) * (lse + neg_lse))
     return fval
 
 def sl1_grad(w, alpha, _lambda):
@@ -449,6 +485,36 @@ def sl1_grad(w, alpha, _lambda):
     grad = grad.reshape(n_feature, n_class)
 
     return grad
+
+def sl1_grad_cp(w, alpha, _lambda):
+    import cupy as cp
+    (n_feature, n_class) = w.shape
+    w = w.reshape(-1, 1)
+    lse = logsumexp_cp(cp.hstack([cp.zeros((n_feature*n_class, 1)), alpha*w]))
+    lambda_vec = (_lambda * cp.ones(n_feature*n_class)).squeeze()
+    grad = (lambda_vec * (1.0 - 2.0 * cp.exp(-lse))).reshape(-1, 1)
+    grad = grad.reshape(n_feature, n_class)
+    return grad
+
+def l2_fval(w, _lambda):
+    fval = 0.5 * _lambda * np.sum( w**2)
+    return fval
+
+def l2_fval_cp(w, _lambda):
+    import cupy as cp
+    w = cp.asarray(w)
+    fval = 0.5 * _lambda * cp.sum( w**2)
+    return fval
+
+def l2_grad(w, _lambda):
+    grad = _lambda * w
+    return grad
+
+def l2_grad_cp(w, _lambda):
+    import cupy as cp
+    w = cp.asarray(w)
+    fval = _lambda * w
+    return fval
 
 def update_alpha(alpha, cnt=0):
     update1 = 1.5
@@ -479,12 +545,78 @@ def mse_sl1_grad(w, X, y, alpha, _lambda):
     return obj_grad + reg_grad
 
 
-def ce_sl1_fval(w, X, y, alpha, _lambda):
-    obj_fval = cross_entropy_loss(y, X, w)
-    reg_fval = sl1_fval(w, alpha, _lambda)
+
+def ce_none_fval(w, X, y, _lambda, ifcupy=True):
+    if ifcupy:
+        import cupy as cp
+        w = cp.asarray(w)
+        X = cp.asarray(X)
+        y = cp.asarray(y)
+        obj_fval = cross_entropy_loss_cp(w, X, y).get()
+    else:
+        obj_fval = cross_entropy_loss(w, X, y)
+    return obj_fval
+
+def ce_none_grad(w, X, y, _lambda, ifcupy=True):
+    if ifcupy:
+        import cupy as cp
+        w = cp.asarray(w)
+        X = cp.asarray(X)
+        y = cp.asarray(y)
+        obj_grad = cross_entropy_gradient_cp(w, X, y).get()
+    else:
+        obj_grad = cross_entropy_gradient(w, X, y)
+    return obj_grad
+
+def ce_sl1_fval(w, X, y, alpha, _lambda, ifcupy=True):
+    if ifcupy:
+        import cupy as cp
+        w = cp.asarray(w)
+        X = cp.asarray(X)
+        y = cp.asarray(y)
+        obj_fval = cross_entropy_loss_cp(w, X, y).get()
+        reg_fval = sl1_fval_cp(w, alpha, _lambda).get()
+    else:
+        obj_fval = cross_entropy_loss(w, X, y)
+        reg_fval = sl1_fval(w, alpha, _lambda)
     return obj_fval + reg_fval
 
-def ce_sl1_grad(w, X, y, alpha, _lambda):
-    obj_grad = cross_entropy_gradient(y, X, w)
-    reg_grad = sl1_grad(w, alpha, _lambda)
+def ce_sl1_grad(w, X, y, alpha, _lambda, ifcupy=True):
+    if ifcupy:
+        import cupy as cp
+        w = cp.asarray(w)
+        X = cp.asarray(X)
+        y = cp.asarray(y)
+        obj_grad = cross_entropy_gradient_cp(w, X, y).get()
+        reg_grad = sl1_grad_cp(w, alpha, _lambda).get()
+    else:
+        obj_grad = cross_entropy_gradient(w, X, y)
+        reg_grad = sl1_grad(w, alpha, _lambda)
+    return obj_grad + reg_grad
+
+
+def ce_l2_fval(w, X, y, _lambda, ifcupy=True):
+    if ifcupy:
+        import cupy as cp
+        w = cp.asarray(w)
+        X = cp.asarray(X)
+        y = cp.asarray(y)
+        obj_fval = cross_entropy_loss_cp(w, X, y).get()
+        reg_fval = l2_fval_cp(w, _lambda).get()
+    else:
+        obj_fval = cross_entropy_loss(w, X, y)
+        reg_fval = l2_fval(w, _lambda)
+    return obj_fval + reg_fval
+
+def ce_l2_grad(w, X, y, _lambda, ifcupy=True):
+    if ifcupy:
+        import cupy as cp
+        w = cp.asarray(w)
+        X = cp.asarray(X)
+        y = cp.asarray(y)
+        obj_grad = cross_entropy_gradient_cp(w, X, y).get()
+        reg_grad = l2_grad_cp(w, _lambda).get()
+    else:
+        obj_grad = cross_entropy_gradient(w, X, y)
+        reg_grad = l2_grad(w, _lambda)
     return obj_grad + reg_grad

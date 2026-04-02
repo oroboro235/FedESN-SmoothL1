@@ -147,7 +147,7 @@ def get_diff_sampling_rate_series(n=5, sample_period=[], len_forecast=1, len_win
 
 def plot_readout(readout):
     import matplotlib.pyplot as plt
-    Wout = readout.Wout
+    Wout = readout
     # bias = readout.bias
     # Wout = np.r_[bias[..., np.newaxis], Wout]
 

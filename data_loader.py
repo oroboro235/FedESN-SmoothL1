@@ -135,7 +135,7 @@ def read_data_har():
 # Written character dataset
 def read_data_char():
 
-    def preprocess_written_char(data_dir, fixed_len=128, num_classes=20, shuffle_seqs=True):
+    def preprocess_written_char(data_dir, max_len=205, num_classes=20, shuffle_seqs=True):
         """Preprocess the UCI written character dataset."""
 
         data = scipy.io.loadmat(data_dir)
@@ -147,14 +147,21 @@ def read_data_char():
         charlabels = consts["charlabels"][0] - 1 # 1, 1, 1, ... ,20, 20 in total 20 classes
 
         # padding the seqs
-        padded_seqs = np.zeros((len(mixout), fixed_len, 3))
+        # find out max length of seqs
+        # max_len = 0
+        # for i in range(len(mixout)):
+        #     seq_len = len(mixout[i][0])
+        #     if seq_len > max_len:
+        #         max_len = seq_len
+        padded_seqs = np.zeros((len(mixout), max_len, 3))
         for i in range(len(mixout)):
             seq = mixout[i].T
             seq_len = len(seq)
-            if seq_len < fixed_len:
-                padded_seqs[i, :seq_len, :] = seq
+            if seq_len < max_len:
+                diff = max_len - seq_len
+                padded_seqs[i, diff:, :] = seq
             else:
-                padded_seqs[i] = seq[:fixed_len,:]
+                padded_seqs[i] = seq[:max_len,:]
         mixout = padded_seqs
         
         # use previous num_classes characters
@@ -221,6 +228,15 @@ def read_data_char():
     return X_train, y_train, X_test, y_test
 
 # Univariate time series dataset
+
+uni_names = [
+        "ECG5000",
+        "DistalPhalanxOutlineCorrect",
+        "Yoga",
+        "Strawberry",
+    ]
+
+
 def read_data_uni(dataset_name):
 
     def load_classification_Uni_ts(dataset_name):
@@ -255,12 +271,73 @@ def read_data_uni(dataset_name):
 
     return X_train, y_train, X_test, y_test
 
-# read data from 
+# read data from Japanese vowels dataset
+def read_data_jpv():
+    # read from reservoirpy
+    from reservoirpy.datasets import japanese_vowels
+    max_len=29
+    X_train, X_test, Y_train, Y_test = japanese_vowels()
+    for i in range(len(X_train)):
+        seq_len = len(X_train[i])
+        if seq_len > max_len:
+            max_len = seq_len
+    for i in range(len(X_test)):
+        seq_len = len(X_test[i])
+        if seq_len > max_len:
+            max_len = seq_len
+    padded_seqs_train = np.zeros((len(X_train), max_len, 12))
+    for i in range(len(X_train)):
+        seq = X_train[i]
+        seq_len = len(seq)
+        if seq_len < max_len:
+            diff = max_len - seq_len
+            padded_seqs_train[i, diff:, :] = seq
+        else:
+            padded_seqs_train[i] = seq[:max_len,:]
+    X_train = padded_seqs_train
+    Y_train = np.array(Y_train)
+    # from one-hot to integer
+    Y_train = np.argmax(Y_train.squeeze(), axis=1)
+    padded_seqs_test = np.zeros((len(X_test), max_len, 12))
+    for i in range(len(X_test)):
+        seq = X_test[i]
+        seq_len = len(seq)
+        if seq_len < max_len:
+            diff = max_len - seq_len
+            padded_seqs_test[i, diff:, :] = seq
+        else:
+            padded_seqs_test[i] = seq[:max_len,:]
+    X_test = padded_seqs_test
+    Y_test = np.array(Y_test)
+    Y_test = np.argmax(Y_test.squeeze(), axis=1)
+
+
+    return X_train, Y_train, X_test, Y_test
+
+
+def read_data(name=None):
+    if name == "mg":
+        return read_data_mg()
+    elif name == "lorenz":
+        return read_data_lorenz()
+    elif name == "har":
+        return read_data_har()
+    elif name == "char":
+        return read_data_char()
+    elif name in uni_names:
+        return read_data_uni(name)
+    elif name == "jpv":
+        return read_data_jpv()
+    else:
+        raise ValueError("Invalid dataset name")
+    
+    
 
 
 if __name__ == "__main__":
     # test
-    X_train, y_train, X_test, y_test = read_data_char()
+    X_train, y_train, X_test, y_test = read_data("jpv")
+    # X_train, y_train, X_test, y_test = read_data(uni_names[3])
     # X_train, y_train, X_test, y_test = read_data_uni("Beef")
 
     print(X_train.shape, y_train.shape, X_test.shape, y_test.shape)
