@@ -1,0 +1,46 @@
+# This file becomes .gitignore in the public GitHub snapshot.
+# Kept separate from the working .gitignore, which carries GitLab-only rules.
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Generated files — regenerated on each run
+*.log
+*.npz
+*.png
+
+# cache: keep the folder (via .gitkeep), ignore everything inside
+cache/*
+!cache/.gitkeep
+
+# raw datasets: keep only the top-level folder, ignore all data inside
+raw/*
+!raw/.gitkeep
+
+# result outputs: keep the folder structure (via .gitkeep), ignore the files inside
+result/**
+!result/**/
+!result/**/.gitkeep
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+
+# Local run command list
+commands.txt

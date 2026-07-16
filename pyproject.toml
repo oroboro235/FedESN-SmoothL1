@@ -1,0 +1,43 @@
+[project]
+name = "fedsl1esn"
+version = "0.1.0"
+description = "Federated Smooth-L1 Echo State Networks"
+requires-python = ">=3.10,<3.11"
+
+# Every third-party module the code actually imports, pinned to the versions the
+# published results were produced with.
+dependencies = [
+    "aeon==1.3.0",
+    "reservoirpy==0.4.1",
+    "torch==2.9.1",
+    "numpy==2.2.6",
+    "scipy==1.15.3",
+    "scikit-learn==1.7.2",
+    "pandas==2.3.3",
+    "matplotlib==3.10.7",
+    "joblib==1.5.2",
+    # Pulled in transitively by aeon→scikit-learn, but utils.parallel_map depends on
+    # it directly: without it, _call_star silently skips threadpool_limits and every
+    # worker spawns a full BLAS thread pool (N×N oversubscription).  Pin it explicitly.
+    "threadpoolctl==3.6.0",
+]
+
+[project.optional-dependencies]
+# CuPy is imported lazily in funcs._get_xp and gated by funcs.resolve_use_gpu(),
+# so CPU-only machines never need it.  On a CUDA 12 box:  uv sync --extra gpu
+gpu = ["cupy-cuda12x>=13.3"]
+
+# Torch is only ever used for the CPU optimizers in readout_node (SGD/Adam over
+# Wout); nothing is moved to a device.  GPU work goes through CuPy instead, so the
+# CUDA build of torch would ship several GB of unused runtime on every machine.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+# Flat script repo, not an installable package.
+[tool.uv]
+package = false

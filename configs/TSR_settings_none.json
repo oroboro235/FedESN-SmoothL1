@@ -1,0 +1,36 @@
+[
+    {
+        "dataset": "lorenz",
+        "reg_type": "none",
+        "units": 500,
+        "warmup": 100,
+        "sr": 1.03532871,
+        "lr": 0.31155077,
+        "input_scaling": 0.20964846,
+        "reg_param": 0.0,
+        "noise_rc": 0.001,
+        "_search_select_metric": "vpt",
+        "_search_vpt": 230.3333,
+        "_search_rmse": 6.39035269,
+        "_search_nrmse": 0.8367076,
+        "_search_sparsity": 0.0,
+        "_search_source": "pso"
+    },
+    {
+        "dataset": "mg",
+        "reg_type": "none",
+        "units": 500,
+        "warmup": 100,
+        "sr": 1.25230501,
+        "lr": 0.47921322,
+        "input_scaling": 3.10101904,
+        "reg_param": 0.0,
+        "noise_rc": 0.001,
+        "_search_select_metric": "vpt",
+        "_search_vpt": 400.0,
+        "_search_rmse": 0.0311369,
+        "_search_nrmse": 0.14488122,
+        "_search_sparsity": 0.0,
+        "_search_source": "pso"
+    }
+]

@@ -1,0 +1,112 @@
+# GENERATED FROM uv.lock — DO NOT EDIT BY HAND.
+# Regenerate with:  uv export --format requirements-txt --no-hashes --no-emit-project -o requirements.txt
+# (then re-add the --extra-index-url line below; uv export omits it)
+#
+# Preferred workflow is uv:
+#     uv sync                # CPU (this file's equivalent)
+#     uv sync --extra gpu    # + CuPy, on a CUDA 12 machine
+#
+# This file is for plain pip (`pip install -r requirements.txt`, verified working).
+# `uv pip install -r requirements.txt` needs --index-strategy unsafe-best-match,
+# because uv will not look past the first index that carries a package.
+#
+# torch is pinned to the CPU build: it is only used for the CPU optimizers in
+# readout_node (SGD/Adam over Wout) and nothing is ever moved to a device.
+# GPU acceleration goes through CuPy instead — see the 'gpu' extra in pyproject.toml.
+--extra-index-url https://download.pytorch.org/whl/cpu
+aeon==1.3.0
+    # via fedsl1esn
+contourpy==1.3.2
+    # via matplotlib
+cycler==0.12.1
+    # via matplotlib
+deprecated==1.3.1
+    # via aeon
+filelock==3.29.7
+    # via torch
+fonttools==4.63.0
+    # via matplotlib
+fsspec==2026.6.0
+    # via torch
+jinja2==3.1.6
+    # via torch
+joblib==1.5.2
+    # via
+    #   fedsl1esn
+    #   reservoirpy
+    #   scikit-learn
+kiwisolver==1.5.0
+    # via matplotlib
+llvmlite==0.44.0
+    # via numba
+markupsafe==3.0.3
+    # via jinja2
+matplotlib==3.10.7
+    # via fedsl1esn
+mpmath==1.3.0
+    # via sympy
+networkx==3.4.2
+    # via torch
+numba==0.61.2
+    # via aeon
+numpy==2.2.6
+    # via
+    #   aeon
+    #   contourpy
+    #   fedsl1esn
+    #   matplotlib
+    #   numba
+    #   pandas
+    #   reservoirpy
+    #   scikit-learn
+    #   scipy
+packaging==26.2
+    # via
+    #   aeon
+    #   matplotlib
+pandas==2.3.3
+    # via
+    #   aeon
+    #   fedsl1esn
+pillow==12.3.0
+    # via matplotlib
+pyparsing==3.3.2
+    # via matplotlib
+python-dateutil==2.9.0.post0
+    # via
+    #   matplotlib
+    #   pandas
+pytz==2026.2
+    # via pandas
+reservoirpy==0.4.1
+    # via fedsl1esn
+scikit-learn==1.7.2
+    # via
+    #   aeon
+    #   fedsl1esn
+scipy==1.15.3
+    # via
+    #   aeon
+    #   fedsl1esn
+    #   reservoirpy
+    #   scikit-learn
+six==1.17.0
+    # via python-dateutil
+sympy==1.14.0
+    # via torch
+threadpoolctl==3.6.0
+    # via
+    #   fedsl1esn
+    #   scikit-learn
+torch==2.9.1 ; sys_platform == 'darwin'
+    # via fedsl1esn
+torch==2.9.1+cpu ; sys_platform != 'darwin'
+    # via fedsl1esn
+typing-extensions==4.16.0
+    # via
+    #   aeon
+    #   torch
+tzdata==2026.3
+    # via pandas
+wrapt==2.2.2
+    # via deprecated

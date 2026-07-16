@@ -1,0 +1,62 @@
+[
+    {
+        "dataset": "DistalPhalanxOutlineCorrect",
+        "input_dim": 1,
+        "output_dim": 2,
+        "units": 500
+    },
+    {
+        "dataset": "ECG5000",
+        "input_dim": 1,
+        "output_dim": 5,
+        "units": 500
+    },
+    {
+        "dataset": "Strawberry",
+        "input_dim": 1,
+        "output_dim": 2,
+        "units": 500
+    },
+    {
+        "dataset": "Yoga",
+        "input_dim": 1,
+        "output_dim": 2,
+        "units": 500
+    },
+    {
+        "dataset": "char",
+        "input_dim": 3,
+        "output_dim": 20,
+        "units": 500
+    },
+    {
+        "dataset": "har",
+        "input_dim": 9,
+        "output_dim": 6,
+        "units": 500
+    },
+    {
+        "dataset": "jpv",
+        "input_dim": 12,
+        "output_dim": 9,
+        "units": 500
+    },
+    {
+        "dataset": "synth_easy",
+        "input_dim": 1,
+        "output_dim": 5,
+        "units": 500
+    },
+    {
+        "dataset": "synth_hard",
+        "input_dim": 1,
+        "output_dim": 5,
+        "units": 500
+    },
+    {
+        "dataset": "synth_med",
+        "input_dim": 1,
+        "output_dim": 5,
+        "units": 500
+    }
+]
